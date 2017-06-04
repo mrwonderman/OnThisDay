@@ -35,7 +35,9 @@ public class OnThisDayAPI {
 
     private static String getRawData(int month, int day) {
         try {
-            return Unirest.get(constructDateUrl(month, day)).asString().getBody();
+            String url = constructDateUrl(month, day);
+            System.out.println("connecting to " + url);
+            return Unirest.get(url).asString().getBody();
         } catch (UnirestException e) {
             e.printStackTrace();
         }
@@ -57,8 +59,11 @@ public class OnThisDayAPI {
         String[] split = myPattern.split(s);
 
         for (int i = 0; i < split.length; i++) {
-            if (split[i].startsWith(" – ")) {
+            if (split[i].contains(" – ")) {
                 String year = split[i - 1];
+                if(split[i].contains(" – ") && !year.matches(".*\\d+.*")){
+                    year = split[i].substring(0,split[i].indexOf("–")).trim();
+                }
                 String info = String.join("", ArrayUtils.subarray(split, i + 1, i + 20));
                 if (info.contains("–") && info.length() > 4) {
                     info = info.substring(0, info.indexOf("\n"));
@@ -79,7 +84,9 @@ public class OnThisDayAPI {
             return null;
         }
 
-        return cleanHTML(getRawData(month, day));
+        cleanHTML(getRawData(month, day));
+
+        return happenings;
     }
 
     private static void populateMonths() {
@@ -105,27 +112,33 @@ public class OnThisDayAPI {
         happenings.add(new Happening(year, happening, type));
     }
 
-    public static String getHappeningsAsJson(int month, int day) {
-        Gson g = new Gson();
+    public static Export getHappeningsExport(int month, int day) {
         Export export = new Export();
 
         for (Happening happening : OnThisDayAPI.getInformation(month, day)) {
             switch (happening.getType()) {
                 case BIRTH:
                     export.addBirth(happening);
+                    break;
                 case DEATH:
                     export.addDeath(happening);
+                    break;
                 case EVENT:
                     export.addEvent(happening);
+                    break;
             }
         }
-
-        return g.toJson(export);
+        return export;
     }
 
-    public static void getHappeningsToFile(int month, int day){
+    public static String getHappeningsAsJson(int month, int day) {
+        Gson g = new Gson();
+        return g.toJson(getHappeningsExport(month, day));
+    }
+
+    public static void getHappeningsToFile(int month, int day) {
         try (Writer writer = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream("filename.json"), "utf-8"))) {
+                new FileOutputStream("export_" + month + "_" + day + ".json"), "utf-8"))) {
             writer.write(getHappeningsAsJson(month, day));
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
